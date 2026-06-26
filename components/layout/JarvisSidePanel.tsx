@@ -71,7 +71,7 @@ export function JarvisSidePanel() {
 
               {/* Chat */}
               <div className="flex-1 overflow-hidden p-4">
-                <ChatInterface compact />
+                <ChatInterface />
               </div>
             </motion.div>
           </>
