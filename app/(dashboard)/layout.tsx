@@ -19,7 +19,7 @@ export default function DashboardLayout({
       <TopBar />
 
       <main
-        className="transition-all pt-16 min-h-screen"
+        className="transition-all pt-24 min-h-screen"
         style={{ marginLeft: sidebarOpen ? '220px' : '64px' }}
       >
         <div className="p-6">

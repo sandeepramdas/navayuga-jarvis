@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
-import { AppContext } from './store'
-import type { ToastItem, Theme } from './store'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { AppContext, ALL_PROJECT_IDS } from './store'
+import type { ToastItem, Theme, ProjectFilters } from './store'
 import type { Role } from './rbac'
 
 let toastCounter = 0
@@ -26,6 +26,8 @@ function applyThemeToDom(t: Theme) {
   }
 }
 
+const DEFAULT_FILTERS: ProjectFilters = { type: null, status: null, phase: null, sortBy: 'risk' }
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<Role>('md')
   const [theme, setThemeState] = useState<Theme>('dark')
@@ -34,13 +36,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [recommendationStates, setRecommendationStates] = useState<Record<string, 'approved' | 'dismissed' | 'assigned'>>({})
   const [alertStates, setAlertStates] = useState<Record<string, 'acknowledged' | 'resolved' | 'dismissed'>>({})
+  const [selectedProjects, setSelectedProjectsState] = useState<string[]>(ALL_PROJECT_IDS)
+  const [projectFilters, setProjectFiltersState] = useState<ProjectFilters>(DEFAULT_FILTERS)
+  const [liveTick, setLiveTick] = useState(0)
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // On mount: read saved theme and apply it to DOM
+  // On mount: restore theme + start live tick
   useEffect(() => {
     const stored = (localStorage.getItem('necl-theme') as Theme) || 'dark'
     setThemeState(stored)
     applyThemeToDom(stored)
+
+    // Live data tick every 20 seconds
+    tickRef.current = setInterval(() => {
+      setLiveTick(t => t + 1)
+    }, 20000)
+
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current)
+    }
   }, [])
+
+  // When role changes to site-manager, lock to KDSP-B1
+  useEffect(() => {
+    if (role === 'site-manager') {
+      setSelectedProjectsState(['KDSP-B1'])
+    } else {
+      setSelectedProjectsState(ALL_PROJECT_IDS)
+    }
+  }, [role])
 
   const setRole = useCallback((r: Role) => setRoleState(r), [])
 
@@ -48,6 +72,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setThemeState(t)
     localStorage.setItem('necl-theme', t)
     applyThemeToDom(t)
+  }, [])
+
+  const setSelectedProjects = useCallback((ids: string[]) => {
+    if (role !== 'site-manager') {
+      setSelectedProjectsState(ids.length > 0 ? ids : ALL_PROJECT_IDS)
+    }
+  }, [role])
+
+  const setProjectFilters = useCallback((partial: Partial<ProjectFilters>) => {
+    setProjectFiltersState(prev => ({ ...prev, ...partial }))
   }, [])
 
   const addToast = useCallback((toast: Omit<ToastItem, 'id'>) => {
@@ -80,6 +114,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toasts, addToast, removeToast,
       recommendationStates, setRecommendationState,
       alertStates, setAlertState,
+      selectedProjects, setSelectedProjects,
+      projectFilters, setProjectFilters,
+      liveTick,
     }}>
       {children}
     </AppContext.Provider>
