@@ -8,6 +8,7 @@ import {
   CalendarDays, TrendingDown, Flag, Activity,
 } from 'lucide-react'
 import { useApp } from '@/lib/store'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
 import { projects } from '@/lib/mock-data/projects'
 import {
   projectOrchestrations, getMilestoneStats,
@@ -403,6 +404,20 @@ export default function OrchestrationPage() {
     const filtered = projects.filter(p => selectedProjects.includes(p.id))
     return filtered.reduce((sum, p) => sum + p.budget, 0)
   }, [selectedProjects])
+
+  if (selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-necl-accent/15 flex items-center justify-center">
+            <GitBranch className="w-4 h-4 text-necl-accent" />
+          </div>
+          <h1 className="text-2xl font-bold text-necl-text">Process Orchestration</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-[1600px]">

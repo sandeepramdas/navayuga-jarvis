@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Truck, Wrench, Fuel, Gauge } from 'lucide-react'
+import { Truck } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { KPITile } from '@/components/ui/KPITile'
 import { AlertItem } from '@/components/ui/AlertItem'
@@ -10,35 +10,64 @@ import { DrawerDetail } from '@/components/ui/DrawerDetail'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { NECLDonutChart } from '@/components/charts/DonutChart'
 import { NECLBarChart } from '@/components/charts/BarChart'
-import { fleet, getFleetSummary } from '@/lib/mock-data/fleet'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
+import { fleet } from '@/lib/mock-data/fleet'
 import { alerts } from '@/lib/mock-data/alerts'
 import { recommendations } from '@/lib/mock-data/predictions'
 import { formatINR } from '@/lib/utils'
 import type { Alert } from '@/lib/mock-data/alerts'
 
-const summary = getFleetSummary()
-const fleetAlerts = alerts.filter(a => a.department === 'fleet')
-const fleetRecs = recommendations.filter(r => r.department === 'Fleet')
-
-const utilizationData = fleet.slice(0, 10).map(m => ({
-  machine: `${m.brand} ${m.model.split(' ')[0]}`,
-  utilization: m.utilization,
-}))
-
-const donutData = [
-  { label: 'Active', value: summary.active, color: '#10B981' },
-  { label: 'Idle', value: summary.idle, color: '#F59E0B' },
-  { label: 'Maintenance', value: summary.maintenance, color: '#EF4444' },
-]
-
 export default function FleetPage() {
-  const { role } = useApp()
+  const { role, selectedProjects } = useApp()
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'idle' | 'maintenance'>('all')
 
-  const visibleFleet = role === 'site-manager'
+  const isSiteManager = role === 'site-manager'
+
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <Truck className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">Fleet Management</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const visibleFleet = isSiteManager
     ? fleet.filter(m => m.projectId === 'KDSP-B1')
-    : fleet
+    : fleet.filter(m => selectedProjects.includes(m.projectId))
+
+  const active = visibleFleet.filter(m => m.status === 'active').length
+  const idle = visibleFleet.filter(m => m.status === 'idle').length
+  const maintenance = visibleFleet.filter(m => m.status === 'maintenance').length
+  const avgUtilization = visibleFleet.length
+    ? Math.round(visibleFleet.reduce((s, m) => s + m.utilization, 0) / visibleFleet.length)
+    : 0
+  const totalIdleCost = visibleFleet.filter(m => m.status === 'idle').reduce((s, m) => s + m.dailyIdleCost, 0)
+  const criticalMaintenance = visibleFleet.filter(m => m.predictiveMaintenance.riskLevel === 'critical').length
+
+  const utilizationData = visibleFleet.slice(0, 10).map(m => ({
+    machine: `${m.brand} ${m.model.split(' ')[0]}`,
+    utilization: m.utilization,
+  }))
+
+  const donutData = [
+    { label: 'Active', value: active, color: '#10B981' },
+    { label: 'Idle', value: idle, color: '#F59E0B' },
+    { label: 'Maintenance', value: maintenance, color: '#EF4444' },
+  ]
+
+  const fleetAlerts = alerts.filter(a =>
+    a.department === 'fleet' &&
+    (isSiteManager ? a.projectId === 'KDSP-B1' : selectedProjects.includes(a.projectId ?? '')),
+  )
+  const fleetRecs = recommendations.filter(r =>
+    r.department === 'Fleet' &&
+    (isSiteManager ? r.projectId === 'KDSP-B1' : selectedProjects.includes(r.projectId ?? '')),
+  )
 
   const filteredFleet = filterStatus === 'all' ? visibleFleet : visibleFleet.filter(m => m.status === filterStatus)
 
@@ -52,32 +81,32 @@ export default function FleetPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPITile
           label="Fleet Utilization"
-          value={`${summary.avgUtilization}%`}
-          subtitle={`${summary.active} active · ${summary.idle} idle`}
+          value={`${avgUtilization}%`}
+          subtitle={`${active} active · ${idle} idle`}
           status="amber"
-          sparklineData={[70, 72, 73, 74, 73, 74, summary.avgUtilization]}
+          sparklineData={[70, 72, 73, 74, 73, 74, avgUtilization]}
         />
         <KPITile
           label="Idle Cost Today"
-          value={formatINR(summary.totalIdleCost)}
-          subtitle={`${summary.idle} idle machines`}
+          value={formatINR(totalIdleCost)}
+          subtitle={`${idle} idle machines`}
           status="red"
-          sparklineData={[60000, 65000, 72000, 68000, 70000, 72000, summary.totalIdleCost]}
+          sparklineData={[60000, 65000, 72000, 68000, 70000, 72000, totalIdleCost]}
           sparklineColor="#EF4444"
         />
         <KPITile
           label="In Maintenance"
-          value={String(summary.maintenance)}
+          value={String(maintenance)}
           subtitle="Down for repairs"
-          status={summary.maintenance > 0 ? 'amber' : 'green'}
-          sparklineData={[0, 1, 1, 2, 2, 2, summary.maintenance]}
+          status={maintenance > 0 ? 'amber' : 'green'}
+          sparklineData={[0, 1, 1, 2, 2, 2, maintenance]}
         />
         <KPITile
           label="Critical Alerts"
-          value={String(summary.criticalMaintenance)}
+          value={String(criticalMaintenance)}
           subtitle="Predictive maintenance due"
-          status={summary.criticalMaintenance > 0 ? 'red' : 'green'}
-          sparklineData={[0, 0, 1, 1, 2, 2, summary.criticalMaintenance]}
+          status={criticalMaintenance > 0 ? 'red' : 'green'}
+          sparklineData={[0, 0, 1, 1, 2, 2, criticalMaintenance]}
           sparklineColor="#EF4444"
         />
       </div>
@@ -89,7 +118,7 @@ export default function FleetPage() {
           <NECLDonutChart
             data={donutData}
             height={200}
-            centerValue={`${summary.total}`}
+            centerValue={`${visibleFleet.length}`}
             centerLabel="machines"
           />
         </div>
@@ -184,6 +213,9 @@ export default function FleetPage() {
             {fleetAlerts.map(a => (
               <AlertItem key={a.id} alert={a} onView={setSelectedAlert} compact />
             ))}
+            {fleetAlerts.length === 0 && (
+              <p className="text-sm text-necl-muted p-4 text-center">No fleet alerts for selected projects</p>
+            )}
           </div>
         </div>
         <div className="space-y-4">
@@ -191,6 +223,11 @@ export default function FleetPage() {
           {fleetRecs.slice(0, 2).map(r => (
             <PrescriptiveCard key={r.id} recommendation={r} />
           ))}
+          {fleetRecs.length === 0 && (
+            <div className="rounded-xl border border-necl-border bg-necl-surface p-6 text-center">
+              <p className="text-sm text-necl-muted">No fleet recommendations for selected projects</p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { KPITile } from '@/components/ui/KPITile'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
 import { PrescriptiveCard } from '@/components/ui/PrescriptiveCard'
 import { ForecastCard } from '@/components/ui/ForecastCard'
 import { DrawerDetail } from '@/components/ui/DrawerDetail'
@@ -139,11 +140,23 @@ export default function CommandCenterPage() {
   const visibleRecs = useMemo(
     () => isSiteManager
       ? recommendations.filter(r => r.projectId === 'KDSP-B1').slice(0, 3)
-      : recommendations.slice(0, 3),
-    [isSiteManager],
+      : recommendations.filter(r => effectiveProjects.includes(r.projectId)).slice(0, 3),
+    [isSiteManager, effectiveProjects],
   )
 
   const allSelected = effectiveProjects.length === 8
+
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div>
+          <h1 className="text-2xl font-bold text-necl-text">Command Center</h1>
+          <p className="text-sm text-necl-muted mt-0.5">Decision intelligence · Live data</p>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
   const projectsLabel = isSiteManager
     ? 'Kaleshwaram Dam Support Pkg-B'
     : allSelected

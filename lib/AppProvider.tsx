@@ -76,7 +76,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedProjects = useCallback((ids: string[]) => {
     if (role !== 'site-manager') {
-      setSelectedProjectsState(ids.length > 0 ? ids : ALL_PROJECT_IDS)
+      setSelectedProjectsState(ids)
     }
   }, [role])
 

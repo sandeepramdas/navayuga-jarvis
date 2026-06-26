@@ -6,21 +6,36 @@ import { useApp } from '@/lib/store'
 import { ForecastCard } from '@/components/ui/ForecastCard'
 import { PrescriptiveCard } from '@/components/ui/PrescriptiveCard'
 import { KPITile } from '@/components/ui/KPITile'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
 import { forecasts, recommendations } from '@/lib/mock-data/predictions'
 
 type SortBy = 'impact' | 'confidence' | 'priority'
 
 export default function PredictivePage() {
-  const { role } = useApp()
+  const { role, selectedProjects } = useApp()
   const [sortBy, setSortBy] = useState<SortBy>('priority')
 
-  const visibleForecasts = role === 'site-manager'
-    ? forecasts.filter(f => f.projectId === 'KDSP-B1')
-    : forecasts
+  const isSiteManager = role === 'site-manager'
 
-  const visibleRecs = role === 'site-manager'
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <TrendingUp className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">Predictive & Prescriptive Hub</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const visibleForecasts = isSiteManager
+    ? forecasts.filter(f => f.projectId === 'KDSP-B1')
+    : forecasts.filter(f => selectedProjects.includes(f.projectId))
+
+  const visibleRecs = isSiteManager
     ? recommendations.filter(r => r.projectId === 'KDSP-B1')
-    : recommendations
+    : recommendations.filter(r => selectedProjects.includes(r.projectId))
 
   const sortedRecs = [...visibleRecs].sort((a, b) => {
     if (sortBy === 'impact') return b.expectedImpactValue - a.expectedImpactValue
@@ -30,7 +45,9 @@ export default function PredictivePage() {
 
   const criticalForecasts = visibleForecasts.filter(f => f.severity === 'critical').length
   const highForecasts = visibleForecasts.filter(f => f.severity === 'high').length
-  const avgConfidence = Math.round(visibleForecasts.reduce((s, f) => s + f.confidence, 0) / visibleForecasts.length)
+  const avgConfidence = visibleForecasts.length
+    ? Math.round(visibleForecasts.reduce((s, f) => s + f.confidence, 0) / visibleForecasts.length)
+    : 0
   const totalImpact = visibleRecs.reduce((s, r) => s + r.expectedImpactValue, 0)
 
   return (
@@ -83,6 +100,11 @@ export default function PredictivePage() {
             {visibleForecasts.map(f => (
               <ForecastCard key={f.id} forecast={f} />
             ))}
+            {visibleForecasts.length === 0 && (
+              <div className="rounded-xl border border-necl-border bg-necl-surface p-6 text-center">
+                <p className="text-sm text-necl-muted">No forecasts for selected projects</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -113,6 +135,11 @@ export default function PredictivePage() {
             {sortedRecs.map(r => (
               <PrescriptiveCard key={r.id} recommendation={r} />
             ))}
+            {sortedRecs.length === 0 && (
+              <div className="rounded-xl border border-necl-border bg-necl-surface p-6 text-center">
+                <p className="text-sm text-necl-muted">No recommendations for selected projects</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

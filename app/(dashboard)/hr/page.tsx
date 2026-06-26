@@ -9,33 +9,61 @@ import { PrescriptiveCard } from '@/components/ui/PrescriptiveCard'
 import { DrawerDetail } from '@/components/ui/DrawerDetail'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { HeatmapGrid } from '@/components/charts/HeatmapGrid'
-import { employees, getHRSummary } from '@/lib/mock-data/hr'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
+import { employees } from '@/lib/mock-data/hr'
 import { alerts } from '@/lib/mock-data/alerts'
 import { recommendations } from '@/lib/mock-data/predictions'
 import type { Alert } from '@/lib/mock-data/alerts'
 
-const summary = getHRSummary()
-const hrAlerts = alerts.filter(a => a.department === 'hr')
-const hrRecs = recommendations.filter(r => r.department === 'HR')
-
-const attritionHeatmap = employees.map(e => ({
-  label: e.name.split(' ')[0],
-  value: e.attritionRisk === 'high' ? 3 : e.attritionRisk === 'medium' ? 2 : 1,
-  maxValue: 3,
-}))
-
 export default function HRPage() {
-  const { role } = useApp()
+  const { role, selectedProjects } = useApp()
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
 
-  const visibleEmployees = role === 'site-manager'
+  const isSiteManager = role === 'site-manager'
+
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <Users className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">HR & People Analytics</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const visibleEmployees = isSiteManager
     ? employees.filter(e => e.projectId === 'KDSP-B1')
-    : employees
+    : employees.filter(e => selectedProjects.includes(e.projectId))
+
+  const hrAlerts = alerts.filter(a =>
+    a.department === 'hr' &&
+    (isSiteManager ? a.projectId === 'KDSP-B1' : selectedProjects.includes(a.projectId ?? '')),
+  )
+  const hrRecs = recommendations.filter(r =>
+    r.department === 'HR' &&
+    (isSiteManager ? r.projectId === 'KDSP-B1' : selectedProjects.includes(r.projectId ?? '')),
+  )
+
+  const attritionHeatmap = visibleEmployees.map(e => ({
+    label: e.name.split(' ')[0],
+    value: e.attritionRisk === 'high' ? 3 : e.attritionRisk === 'medium' ? 2 : 1,
+    maxValue: 3,
+  }))
 
   const highAttrition = visibleEmployees.filter(e => e.attritionRisk === 'high').length
   const mediumAttrition = visibleEmployees.filter(e => e.attritionRisk === 'medium').length
-  const avgAttendance = Math.round(visibleEmployees.reduce((s, e) => s + e.attendance, 0) / visibleEmployees.length)
-  const avgProductivity = Math.round(visibleEmployees.reduce((s, e) => s + e.productivity, 0) / visibleEmployees.length)
+  const avgAttendance = visibleEmployees.length
+    ? Math.round(visibleEmployees.reduce((s, e) => s + e.attendance, 0) / visibleEmployees.length)
+    : 0
+  const avgProductivity = visibleEmployees.length
+    ? Math.round(visibleEmployees.reduce((s, e) => s + e.productivity, 0) / visibleEmployees.length)
+    : 0
+  const total = visibleEmployees.length
+  const attritionIndex = total > 0
+    ? parseFloat(((highAttrition * 3 + mediumAttrition * 1.5) / total * 2).toFixed(1))
+    : 0
 
   return (
     <div className="space-y-6 max-w-[1600px]">
@@ -51,10 +79,10 @@ export default function HRPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPITile
           label="Workforce"
-          value={summary.total.toLocaleString('en-IN')}
-          subtitle="Across all project sites"
+          value={total.toLocaleString('en-IN')}
+          subtitle="Across selected sites"
           status="green"
-          sparklineData={[2200, 2300, 2350, 2400, 2420, 2440, summary.total]}
+          sparklineData={[2200, 2300, 2350, 2400, 2420, 2440, total]}
         />
         <KPITile
           label="Attendance"
@@ -65,10 +93,10 @@ export default function HRPage() {
         />
         <KPITile
           label="Attrition Risk"
-          value={`${summary.attritionIndex}/10`}
+          value={`${attritionIndex}/10`}
           subtitle={`${highAttrition} high · ${mediumAttrition} medium`}
-          status={summary.attritionIndex > 7 ? 'red' : summary.attritionIndex > 4 ? 'amber' : 'green'}
-          sparklineData={[5, 5.5, 6, 6.2, 6.5, 6.7, summary.attritionIndex]}
+          status={attritionIndex > 7 ? 'red' : attritionIndex > 4 ? 'amber' : 'green'}
+          sparklineData={[5, 5.5, 6, 6.2, 6.5, 6.7, attritionIndex]}
           sparklineColor="#F59E0B"
         />
         <KPITile
@@ -102,6 +130,9 @@ export default function HRPage() {
             {hrAlerts.map(a => (
               <AlertItem key={a.id} alert={a} onView={setSelectedAlert} />
             ))}
+            {hrAlerts.length === 0 && (
+              <p className="text-sm text-necl-muted p-4 text-center">No HR alerts for selected projects</p>
+            )}
           </div>
         </div>
       </div>

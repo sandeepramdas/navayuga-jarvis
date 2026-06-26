@@ -6,10 +6,9 @@ import { useApp } from '@/lib/store'
 import { KPITile } from '@/components/ui/KPITile'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { NECLBarChart } from '@/components/charts/BarChart'
-import { employees, getHRSummary } from '@/lib/mock-data/hr'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
+import { employees } from '@/lib/mock-data/hr'
 import { cn } from '@/lib/utils'
-
-const summary = getHRSummary()
 
 const deptData = [
   { dept: 'Engineering', count: 12, avgAttendance: 94, avgProductivity: 84 },
@@ -22,16 +21,32 @@ const deptData = [
 ]
 
 export default function TeamPage() {
-  const { role } = useApp()
+  const { role, selectedProjects } = useApp()
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
 
-  const visibleEmployees = role === 'site-manager'
+  const isSiteManager = role === 'site-manager'
+
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <BarChart2 className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">Team KPI & People Analytics</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const visibleEmployees = isSiteManager
     ? employees.filter(e => e.projectId === 'KDSP-B1')
-    : employees
+    : employees.filter(e => selectedProjects.includes(e.projectId))
 
   const highAttrition = visibleEmployees.filter(e => e.attritionRisk === 'high').length
   const upTrend = visibleEmployees.filter(e => e.trend === 'up').length
-  const avgAttendance = Math.round(visibleEmployees.reduce((s, e) => s + e.attendance, 0) / visibleEmployees.length)
+  const avgAttendance = visibleEmployees.length
+    ? Math.round(visibleEmployees.reduce((s, e) => s + e.attendance, 0) / visibleEmployees.length)
+    : 0
 
   return (
     <div className="space-y-6 max-w-[1600px]">

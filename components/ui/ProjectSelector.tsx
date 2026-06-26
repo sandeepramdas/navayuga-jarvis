@@ -70,8 +70,7 @@ export function ProjectSelector() {
   function toggle(id: string) {
     if (isSiteManager) return
     if (selectedProjects.includes(id)) {
-      const next = selectedProjects.filter(p => p !== id)
-      setSelectedProjects(next.length ? next : ALL_PROJECT_IDS)
+      setSelectedProjects(selectedProjects.filter(p => p !== id))
     } else {
       setSelectedProjects([...selectedProjects, id])
     }

@@ -7,28 +7,48 @@ import { SeverityChip } from '@/components/ui/SeverityChip'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { DrawerDetail } from '@/components/ui/DrawerDetail'
 import { KPITile } from '@/components/ui/KPITile'
-import { alerts, getAlertsSummary } from '@/lib/mock-data/alerts'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
+import { alerts } from '@/lib/mock-data/alerts'
 import { timeAgo } from '@/lib/utils'
 import type { Alert, AlertSeverity, AlertDepartment } from '@/lib/mock-data/alerts'
-
-const summary = getAlertsSummary()
 
 type DeptFilter = 'all' | AlertDepartment
 type SeverityFilter = 'all' | AlertSeverity
 type StatusFilter = 'all' | 'new' | 'acknowledged' | 'resolved'
 
 export default function AlertsPage() {
-  const { role, alertStates } = useApp()
+  const { role, selectedProjects, alertStates } = useApp()
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
   const [deptFilter, setDeptFilter] = useState<DeptFilter>('all')
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
-  const visibleAlerts = role === 'site-manager'
-    ? alerts.filter(a => a.projectId === 'KDSP-B1')
-    : alerts
+  const isSiteManager = role === 'site-manager'
 
-  const filteredAlerts = visibleAlerts.filter(a => {
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <Bell className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">Alerts & Exceptions Center</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const projectAlerts = isSiteManager
+    ? alerts.filter(a => a.projectId === 'KDSP-B1')
+    : alerts.filter(a => selectedProjects.includes(a.projectId ?? ''))
+
+  const summary = {
+    critical: projectAlerts.filter(a => a.severity === 'critical').length,
+    high: projectAlerts.filter(a => a.severity === 'high').length,
+    medium: projectAlerts.filter(a => a.severity === 'medium').length,
+    new: projectAlerts.filter(a => ((alertStates[a.id] as string | undefined) ?? a.status) === 'new').length,
+  }
+
+  const filteredAlerts = projectAlerts.filter(a => {
     if (deptFilter !== 'all' && a.department !== deptFilter) return false
     if (severityFilter !== 'all' && a.severity !== severityFilter) return false
     const effectiveStatus = alertStates[a.id] ?? a.status

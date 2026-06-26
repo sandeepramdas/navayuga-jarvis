@@ -9,6 +9,7 @@ import { PrescriptiveCard } from '@/components/ui/PrescriptiveCard'
 import { DrawerDetail } from '@/components/ui/DrawerDetail'
 import { NECLAreaChart } from '@/components/charts/AreaChart'
 import { StatusPill } from '@/components/ui/StatusPill'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
 import { projects } from '@/lib/mock-data/projects'
 import { alerts } from '@/lib/mock-data/alerts'
 import { recommendations } from '@/lib/mock-data/predictions'
@@ -25,21 +26,43 @@ const progressData = [
   { month: 'Jun', hyd: 67, bmrc: 43, nh: 81, kdsp: 54, chn: 92, mum: 29, rlwy: 71, vizg: 38 },
 ]
 
-const opsAlerts = alerts.filter(a => a.department === 'operations')
-const opsRecs = recommendations.filter(r => r.department === 'Operations')
-
 export default function OperationsPage() {
-  const { role } = useApp()
+  const { role, selectedProjects } = useApp()
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
 
-  const visibleProjects = role === 'site-manager'
+  const isSiteManager = role === 'site-manager'
+
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <Layers className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">Operations</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const visibleProjects = isSiteManager
     ? projects.filter(p => p.id === 'KDSP-B1')
-    : projects
+    : projects.filter(p => selectedProjects.includes(p.id))
+
+  const opsAlerts = alerts.filter(a =>
+    a.department === 'operations' &&
+    (isSiteManager ? a.projectId === 'KDSP-B1' : selectedProjects.includes(a.projectId ?? '')),
+  )
+  const opsRecs = recommendations.filter(r =>
+    r.department === 'Operations' &&
+    (isSiteManager ? r.projectId === 'KDSP-B1' : selectedProjects.includes(r.projectId ?? '')),
+  )
 
   const onTrack = visibleProjects.filter(p => p.status === 'on-track').length
   const atRisk = visibleProjects.filter(p => p.status === 'at-risk').length
   const totalCrew = visibleProjects.reduce((s, p) => s + p.crewCount, 0)
-  const avgProgress = Math.round(visibleProjects.reduce((s, p) => s + p.progress, 0) / visibleProjects.length)
+  const avgProgress = visibleProjects.length
+    ? Math.round(visibleProjects.reduce((s, p) => s + p.progress, 0) / visibleProjects.length)
+    : 0
 
   return (
     <div className="space-y-6 max-w-[1600px]">
@@ -67,14 +90,14 @@ export default function OperationsPage() {
         <KPITile
           label="Total Crew"
           value={totalCrew.toLocaleString('en-IN')}
-          subtitle="Across all active sites"
+          subtitle="Across selected sites"
           status="green"
           sparklineData={[2200, 2300, 2350, 2400, 2420, 2440, totalCrew]}
         />
         <KPITile
           label="Schedule Health"
-          value="5 on time"
-          subtitle="3 projects behind schedule"
+          value={`${visibleProjects.filter(p => p.scheduleVarianceDays <= 0).length} on time`}
+          subtitle={`${visibleProjects.filter(p => p.scheduleVarianceDays > 0).length} behind schedule`}
           status="amber"
           sparklineData={[5, 5, 6, 6, 5, 5, 5]}
         />

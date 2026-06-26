@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ShoppingCart, Package, AlertTriangle } from 'lucide-react'
+import { ShoppingCart, AlertTriangle } from 'lucide-react'
 import { useApp } from '@/lib/store'
 import { KPITile } from '@/components/ui/KPITile'
 import { AlertItem } from '@/components/ui/AlertItem'
@@ -9,15 +9,12 @@ import { PrescriptiveCard } from '@/components/ui/PrescriptiveCard'
 import { DrawerDetail } from '@/components/ui/DrawerDetail'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { NECLBarChart } from '@/components/charts/BarChart'
-import { purchaseOrders, getProcurementSummary } from '@/lib/mock-data/procurement'
+import { NoProjectsSelected } from '@/components/ui/NoProjectsSelected'
+import { purchaseOrders } from '@/lib/mock-data/procurement'
 import { alerts } from '@/lib/mock-data/alerts'
 import { recommendations } from '@/lib/mock-data/predictions'
 import { formatINR } from '@/lib/utils'
 import type { Alert } from '@/lib/mock-data/alerts'
-
-const summary = getProcurementSummary()
-const procAlerts = alerts.filter(a => a.department === 'procurement')
-const procRecs = recommendations.filter(r => r.department === 'Procurement')
 
 const categoryData = [
   { category: 'Steel', value: 2382 },
@@ -32,13 +29,36 @@ const categoryData = [
 type POStatus = 'pending' | 'approved' | 'delayed' | 'received'
 
 export default function ProcurementPage() {
-  const { role } = useApp()
+  const { role, selectedProjects } = useApp()
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
   const [filterStatus, setFilterStatus] = useState<'all' | POStatus>('all')
 
-  const visiblePOs = role === 'site-manager'
+  const isSiteManager = role === 'site-manager'
+
+  if (!isSiteManager && selectedProjects.length === 0) {
+    return (
+      <div className="space-y-6 max-w-[1600px]">
+        <div className="flex items-center gap-3">
+          <ShoppingCart className="w-5 h-5 text-necl-accent" />
+          <h1 className="text-2xl font-bold text-necl-text">Procurement</h1>
+        </div>
+        <NoProjectsSelected />
+      </div>
+    )
+  }
+
+  const visiblePOs = isSiteManager
     ? purchaseOrders.filter(po => po.projectId === 'KDSP-B1')
-    : purchaseOrders
+    : purchaseOrders.filter(po => selectedProjects.includes(po.projectId))
+
+  const procAlerts = alerts.filter(a =>
+    a.department === 'procurement' &&
+    (isSiteManager ? a.projectId === 'KDSP-B1' : selectedProjects.includes(a.projectId ?? '')),
+  )
+  const procRecs = recommendations.filter(r =>
+    r.department === 'Procurement' &&
+    (isSiteManager ? r.projectId === 'KDSP-B1' : selectedProjects.includes(r.projectId ?? '')),
+  )
 
   const filteredPOs = filterStatus === 'all' ? visiblePOs : visiblePOs.filter(po => po.status === filterStatus)
   const totalOpen = visiblePOs.filter(p => p.status !== 'received').reduce((s, p) => s + p.totalValue, 0)
@@ -109,6 +129,9 @@ export default function ProcurementPage() {
             {procAlerts.slice(0, 4).map(a => (
               <AlertItem key={a.id} alert={a} onView={setSelectedAlert} compact />
             ))}
+            {procAlerts.length === 0 && (
+              <p className="text-sm text-necl-muted p-4 text-center">No supply chain alerts</p>
+            )}
           </div>
         </div>
       </div>
@@ -164,6 +187,13 @@ export default function ProcurementPage() {
                   </td>
                 </tr>
               ))}
+              {filteredPOs.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-necl-muted text-sm">
+                    No purchase orders match the selected filters
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
