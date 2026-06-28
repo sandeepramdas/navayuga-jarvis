@@ -1,14 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { MapPin, Users, Truck, Package, Bot, Calendar, TrendingUp, TrendingDown } from 'lucide-react'
+import { MapPin, Users, Truck, Package, Bot, Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { AlertItem } from '@/components/ui/AlertItem'
 import { PrescriptiveCard } from '@/components/ui/PrescriptiveCard'
 import { DrawerDetail } from '@/components/ui/DrawerDetail'
 import { useApp } from '@/lib/store'
 import { formatINR, formatDate } from '@/lib/utils'
+import { projects } from '@/lib/mock-data/projects'
 import type { Project } from '@/lib/mock-data/projects'
 import type { Machine } from '@/lib/mock-data/fleet'
 import type { PurchaseOrder } from '@/lib/mock-data/procurement'
@@ -31,9 +33,20 @@ const machineStatusDot = {
   maintenance: 'bg-necl-critical',
 }
 
+const STATUS_DOT: Record<string, string> = {
+  'on-track': 'bg-necl-success',
+  'at-risk':  'bg-necl-warning',
+  'delayed':  'bg-necl-critical',
+}
+
 export function ProjectPageClient({ project, machines, pos, employees, projectAlerts, recommendations }: Props) {
-  const { setJarvisPanelOpen } = useApp()
+  const { setJarvisPanelOpen, role } = useApp()
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
+
+  const visibleProjects = role === 'site-manager' ? projects.filter(p => p.id === 'KDSP-B1') : projects
+  const currentIdx = visibleProjects.findIndex(p => p.id === project.id)
+  const prevProject = currentIdx > 0 ? visibleProjects[currentIdx - 1] : null
+  const nextProject = currentIdx < visibleProjects.length - 1 ? visibleProjects[currentIdx + 1] : null
 
   const budgetVariance = project.actual - project.budget
   const isOverBudget = budgetVariance > 0
@@ -42,6 +55,62 @@ export function ProjectPageClient({ project, machines, pos, employees, projectAl
 
   return (
     <div className="space-y-6 max-w-[1600px]">
+      {/* Project navigator */}
+      <div className="flex items-center justify-between gap-3">
+        {/* Back to all */}
+        <Link
+          href="/project"
+          className="flex items-center gap-1.5 text-xs text-necl-muted hover:text-necl-text transition-colors"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          All Projects
+        </Link>
+
+        {/* Project pill switcher */}
+        <div className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 hide-scrollbar">
+          {visibleProjects.map(p => (
+            <Link
+              key={p.id}
+              href={`/project/${p.id}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                p.id === project.id
+                  ? 'border-necl-accent bg-necl-accent text-white'
+                  : 'border-[var(--color-necl-border)] text-necl-muted hover:border-necl-accent/40 hover:text-necl-text'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[p.status]}`} />
+              {p.id}
+            </Link>
+          ))}
+        </div>
+
+        {/* Prev / Next */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {prevProject ? (
+            <Link
+              href={`/project/${prevProject.id}`}
+              className="p-1.5 rounded-lg border border-[var(--color-necl-border)] text-necl-muted hover:border-necl-accent/40 hover:text-necl-text transition-colors"
+              title={prevProject.name}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <span className="p-1.5 opacity-30 cursor-default"><ChevronLeft className="w-3.5 h-3.5 text-necl-muted" /></span>
+          )}
+          {nextProject ? (
+            <Link
+              href={`/project/${nextProject.id}`}
+              className="p-1.5 rounded-lg border border-[var(--color-necl-border)] text-necl-muted hover:border-necl-accent/40 hover:text-necl-text transition-colors"
+              title={nextProject.name}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <span className="p-1.5 opacity-30 cursor-default"><ChevronRight className="w-3.5 h-3.5 text-necl-muted" /></span>
+          )}
+        </div>
+      </div>
+
       {/* Project Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}

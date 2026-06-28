@@ -24,6 +24,7 @@ const breadcrumbMap: Record<string, string> = {
   '/team':           'Team KPI',
   '/governance':     'Governance',
   '/orchestration':  'Orchestration',
+  '/project':        'Project Sites',
 }
 
 const alertsSummary = getAlertsSummary()
@@ -33,9 +34,10 @@ export function TopBar() {
   const pathname = usePathname()
   const currentRole = ROLES[role]
 
-  const currentPage = Object.entries(breadcrumbMap).find(([key]) => pathname.endsWith(key))?.[1] ?? 'Command Center'
-  const isProjectPage = pathname.includes('/project/')
-  const pageLabel = isProjectPage ? 'Project Site' : currentPage
+  const isProjectDetail = /\/project\/[^/]+$/.test(pathname)
+  const isProjectIndex  = pathname === '/project'
+  const currentPage = Object.entries(breadcrumbMap).find(([key]) => pathname === key || pathname.startsWith(key + '/'))?.[1] ?? 'Command Center'
+  const pageLabel = isProjectDetail ? 'Project Site' : currentPage
 
   return (
     <header

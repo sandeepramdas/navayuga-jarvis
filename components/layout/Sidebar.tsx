@@ -31,7 +31,7 @@ const navItems = [
   { href: '/finance',        icon: IndianRupee,  label: 'Finance',        group: 'main' },
   { href: '/hr',             icon: Users,        label: 'HR',             group: 'main' },
   { divider: true, group: 'secondary' },
-  { href: '/project/HYD-M3',icon: MapPin,       label: 'Project Sites',  group: 'secondary' },
+  { href: '/project',        icon: MapPin,       label: 'Project Sites',  group: 'secondary' },
   { href: '/jarvis',         icon: Bot,          label: 'Jarvis AI',      group: 'secondary' },
   { href: '/alerts',         icon: Bell,         label: 'Alerts',         group: 'secondary' },
   { href: '/predictive',     icon: TrendingUp,   label: 'Predictive',     group: 'secondary' },
