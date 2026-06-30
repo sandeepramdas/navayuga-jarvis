@@ -137,52 +137,100 @@ function LiveActivityFeed({ events, tick }: { events: ActivityEvent[]; tick: num
 function PortfolioRiskMatrix({ visibleProjects }: { visibleProjects: typeof projects }) {
   const STATUS_HEX: Record<string, string> = { 'on-track': '#10B981', 'at-risk': '#F59E0B', 'delayed': '#EF4444' }
 
-  // Map: X = schedule variance (-40 to +120 days), Y = cost variance (-8 to +20%)
-  const mapX = (d: number) => Math.max(16, Math.min(284, ((d + 40) / 160) * 268 + 16))
-  const mapY = (p: number) => Math.max(14, Math.min(186, (1 - (p + 8) / 28) * 172 + 14))
-  const zeroX = mapX(0)
-  const zeroY = mapY(0)
+  const W = 300, H = 200
+  const ML = 20, MT = 12, MR = 6, MB = 18
+  const PW = W - ML - MR, PH = H - MT - MB
+
+  // Dynamic axis range: expand to data extents + 20% padding so dots spread across the plot
+  const xs = visibleProjects.map(p => p.scheduleVarianceDays)
+  const ys = visibleProjects.map(p => p.costVariance)
+  const xSpan = Math.max(...xs) - Math.min(...xs)
+  const ySpan = Math.max(...ys) - Math.min(...ys)
+  const xPad  = Math.max(12, xSpan * 0.22)
+  const yPad  = Math.max(2,  ySpan * 0.22)
+  const xMin  = Math.min(-8, Math.min(...xs) - xPad)
+  const xMax  = Math.max(8,  Math.max(...xs) + xPad)
+  const yMin  = Math.min(-1, Math.min(...ys) - yPad)
+  const yMax  = Math.max(2,  Math.max(...ys) + yPad)
+
+  const toX = (v: number) => ML + ((v - xMin) / (xMax - xMin)) * PW
+  const toY = (v: number) => MT + PH - ((v - yMin) / (yMax - yMin)) * PH
+  const zX = toX(0), zY = toY(0)
+
+  // Pre-compute dot positions
+  const dots = visibleProjects.map(p => ({
+    id: p.id,
+    cx: toX(p.scheduleVarianceDays),
+    cy: toY(p.costVariance),
+    color: STATUS_HEX[p.status] ?? '#64748B',
+  }))
+
+  // Collision-aware label placement: try 6 candidate offsets, pick first with no clash
+  const placed: { x: number; y: number }[] = []
+  const CANDS = [
+    { dx: 0,   dy: -10, ta: 'middle' as const },
+    { dx: 10,  dy: -6,  ta: 'start'  as const },
+    { dx: -10, dy: -6,  ta: 'end'    as const },
+    { dx: 0,   dy: 12,  ta: 'middle' as const },
+    { dx: 10,  dy: 6,   ta: 'start'  as const },
+    { dx: -10, dy: 6,   ta: 'end'    as const },
+  ]
+  const dotLabels = dots.map(d => {
+    for (const c of CANDS) {
+      const lx = d.cx + c.dx, ly = d.cy + c.dy
+      if (!placed.some(p => Math.abs(p.x - lx) < 20 && Math.abs(p.y - ly) < 9)) {
+        placed.push({ x: lx, y: ly })
+        return { x: lx, y: ly, ta: c.ta }
+      }
+    }
+    const fb = { x: d.cx, y: d.cy - 10 }
+    placed.push(fb)
+    return { ...fb, ta: 'middle' as const }
+  })
 
   return (
-    <div className="relative w-full" style={{ paddingBottom: '66%' }}>
-      <svg
-        viewBox="0 0 300 200"
-        className="absolute inset-0 w-full h-full"
-        style={{ overflow: 'visible' }}
-      >
+    <div className="relative w-full" style={{ paddingBottom: '68%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 w-full h-full">
         {/* Quadrant fills */}
-        <rect x={zeroX} y={0} width={300 - zeroX} height={zeroY} fill="#EF4444" fillOpacity="0.07" />
-        <rect x={0} y={zeroY} width={zeroX} height={200 - zeroY} fill="#10B981" fillOpacity="0.07" />
-        <rect x={0} y={0} width={zeroX} height={zeroY} fill="#F59E0B" fillOpacity="0.04" />
-        <rect x={zeroX} y={zeroY} width={300 - zeroX} height={200 - zeroY} fill="#2563EB" fillOpacity="0.04" />
+        <rect x={ML}  y={MT}  width={zX - ML}       height={zY - MT}      fill="#F59E0B" fillOpacity="0.06" />
+        <rect x={zX}  y={MT}  width={ML + PW - zX}  height={zY - MT}      fill="#EF4444" fillOpacity="0.09" />
+        <rect x={ML}  y={zY}  width={zX - ML}       height={MT + PH - zY} fill="#10B981" fillOpacity="0.09" />
+        <rect x={zX}  y={zY}  width={ML + PW - zX}  height={MT + PH - zY} fill="#2563EB" fillOpacity="0.04" />
 
         {/* Quadrant labels */}
-        <text x={zeroX + 6} y={10} fill="#EF4444" fontSize="6.5" fontWeight="600" opacity="0.7">DANGER ZONE</text>
-        <text x={6} y={196} fill="#10B981" fontSize="6.5" fontWeight="600" opacity="0.7">SAFE</text>
-        <text x={6} y={10} fill="#F59E0B" fontSize="6.5" opacity="0.6">OVER BUDGET</text>
-        <text x={zeroX + 6} y={196} fill="#2563EB" fontSize="6.5" opacity="0.6">AHEAD, UNDER</text>
+        <text x={ML + 3} y={MT + 9}     fill="#F59E0B" fontSize="6"   fontWeight="700" opacity="0.7">OVER BUDGET</text>
+        <text x={zX + 3} y={MT + 9}     fill="#EF4444" fontSize="6"   fontWeight="700" opacity="0.7">DANGER ZONE</text>
+        <text x={ML + 3} y={H - MB - 3} fill="#10B981" fontSize="6"   fontWeight="700" opacity="0.7">SAFE</text>
+        <text x={zX + 3} y={H - MB - 3} fill="#2563EB" fontSize="6"   fontWeight="600" opacity="0.6">AHEAD, UNDER</text>
 
-        {/* Grid lines */}
-        <line x1="0" y1={zeroY} x2="300" y2={zeroY} stroke="#475569" strokeWidth="0.6" strokeDasharray="4,3" />
-        <line x1={zeroX} y1="0" x2={zeroX} y2="200" stroke="#475569" strokeWidth="0.6" strokeDasharray="4,3" />
+        {/* Zero-axis grid lines */}
+        <line x1={ML} y1={zY} x2={ML + PW} y2={zY}     stroke="#475569" strokeWidth="0.6" strokeDasharray="4,3" />
+        <line x1={zX} y1={MT} x2={zX}      y2={MT + PH} stroke="#475569" strokeWidth="0.6" strokeDasharray="4,3" />
 
         {/* Axis labels */}
-        <text x="150" y="199" textAnchor="middle" fill="#64748B" fontSize="6">← ahead · Schedule variance · behind →</text>
-        <text x="4" y="100" textAnchor="middle" fill="#64748B" fontSize="6" transform="rotate(-90 4 100)">↑ overrun · Cost % · under ↓</text>
+        <text x={ML + PW / 2} y={H - 2} textAnchor="middle" fill="#64748B" fontSize="5.5">
+          ← ahead · Schedule variance · behind →
+        </text>
+        <text x={7} y={MT + PH / 2} textAnchor="middle" fill="#64748B" fontSize="5.5"
+          transform={`rotate(-90 7 ${MT + PH / 2})`}>
+          ↑ over · Cost % · under ↓
+        </text>
 
-        {/* Origin label */}
-        <text x={zeroX + 2} y={zeroY - 2} fill="#64748B" fontSize="5.5" opacity="0.8">0,0</text>
-
-        {/* Project dots */}
-        {visibleProjects.map(p => {
-          const cx = mapX(p.scheduleVarianceDays)
-          const cy = mapY(p.costVariance)
-          const color = STATUS_HEX[p.status] ?? '#64748B'
+        {/* Project dots + collision-aware labels */}
+        {dots.map((d, i) => {
+          const lbl = dotLabels[i]
+          const idW = d.id.length * 3.5 + 4
+          const rx  = lbl.ta === 'middle' ? lbl.x - idW / 2
+                    : lbl.ta === 'start'  ? lbl.x - 1
+                    : lbl.x - idW - 1
           return (
-            <g key={p.id}>
-              <circle cx={cx} cy={cy} r="9" fill={color} fillOpacity="0.2" />
-              <circle cx={cx} cy={cy} r="5.5" fill={color} fillOpacity="0.9" />
-              <text x={cx} y={cy - 8} textAnchor="middle" fill="#CBD5E1" fontSize="5.5" fontWeight="700">{p.id}</text>
+            <g key={d.id}>
+              <circle cx={d.cx} cy={d.cy} r="10" fill={d.color} fillOpacity="0.15" />
+              <circle cx={d.cx} cy={d.cy} r="5.5" fill={d.color} fillOpacity="0.92" />
+              <rect x={rx} y={lbl.y - 6.5} width={idW} height={8} rx="2" fill="#0F172A" fillOpacity="0.68" />
+              <text x={lbl.x} y={lbl.y} textAnchor={lbl.ta} fill="#E2E8F0" fontSize="5" fontWeight="700">
+                {d.id}
+              </text>
             </g>
           )
         })}
